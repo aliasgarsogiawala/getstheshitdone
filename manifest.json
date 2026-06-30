@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Maps → Sheet Saver",
+  "version": "1.0.0",
+  "description": "When you save a company in Google Maps, it auto-appends its details to a Google Sheet.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.google.com/maps/*",
+    "https://maps.google.com/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.google.com/maps/*", "https://maps.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Maps → Sheet Saver"
+  }
+}
