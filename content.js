@@ -18,6 +18,38 @@
     return (i >= 0 ? label.slice(i + 1) : label).trim();
   }
 
+  // Labels Maps puts on ads that must never be treated as a company name.
+  const AD_LABELS = /^(sponsored|ad|advertisement|results)$/i;
+
+  // Clean a candidate name: drop leading "Sponsored"/"Ad" badge lines,
+  // return "" if what remains is itself just an ad label.
+  function cleanName(raw) {
+    if (!raw) return "";
+    // The name node often reads "Sponsored\nReal Company" — keep the real part.
+    const parts = raw
+      .split(/[\n\r]+/)
+      .map((s) => s.trim())
+      .filter((s) => s && !AD_LABELS.test(s));
+    let name = parts.length ? parts[parts.length - 1] : raw.trim();
+    // Strip an inline "Sponsored · " / "Ad · " prefix if present.
+    name = name.replace(/^\s*(sponsored|ad|advertisement)\b[\s·:–-]*/i, "").trim();
+    if (AD_LABELS.test(name)) return "";
+    return name;
+  }
+
+  // Best-effort company name: try the panel aria-label and every H1,
+  // skipping anything that is just an ad badge.
+  function getName(panel) {
+    const candidates = [];
+    if (panel.getAttribute) candidates.push(panel.getAttribute("aria-label"));
+    panel.querySelectorAll("h1").forEach((h) => candidates.push(text(h)));
+    for (const c of candidates) {
+      const name = cleanName(c);
+      if (name) return name;
+    }
+    return "";
+  }
+
   // Find the main place details panel that is currently open.
   function getPanel() {
     // The detail pane Google uses; fall back to document if not found.
@@ -28,8 +60,35 @@
     );
   }
 
-  function scrapePlace() {
-    const panel = getPanel();
+  // From the Save button, find the tightest place container it belongs to —
+  // a search-results card if that's where the click came from, otherwise the
+  // detail panel. This is what makes "save from the list" scrape correctly.
+  function getScope(btn) {
+    let el = btn;
+    for (let i = 0; el && i < 12; i++) {
+      if (el.getAttribute) {
+        const role = el.getAttribute("role");
+        if (role === "article") return el; // a results-list card
+      }
+      // A container that holds a place link is a good card boundary.
+      if (
+        el.querySelector &&
+        el.querySelector('a[href*="/maps/place/"]') &&
+        el.querySelector('button[aria-label^="Save" i], button[jsaction*="save" i]')
+      ) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return getPanel();
+  }
+
+  function scrapePlace(scope) {
+    const panel = scope || getPanel();
+
+    // A place link inside a card gives us the real name + URL for that place.
+    const placeLink = panel.querySelector('a[href*="/maps/place/"]');
+
     const place = {
       name: "",
       category: "",
@@ -39,13 +98,13 @@
       phone: "",
       website: "",
       plusCode: "",
-      url: location.href,
+      url: (placeLink && placeLink.href) || location.href,
       savedAt: new Date().toISOString()
     };
 
-    // Name — the panel's H1, or the panel aria-label.
-    const h1 = panel.querySelector("h1");
-    place.name = text(h1) || (panel.getAttribute && panel.getAttribute("aria-label")) || "";
+    // Name — first non-ad candidate from the card link, panel aria-label, or H1s.
+    place.name =
+      cleanName(placeLink && placeLink.getAttribute("aria-label")) || getName(panel);
 
     // Category — button that triggers a category/search jsaction.
     const catBtn = panel.querySelector('button[jsaction*="category"]');
@@ -115,12 +174,17 @@
   let lastSentKey = "";
   let lastSentAt = 0;
 
-  function handleSaveClick() {
-    // Only act when a real place is open.
-    if (!/\/maps\/place\//.test(location.href)) return;
+  function handleSaveClick(btn) {
+    const scope = getScope(btn);
 
-    const place = scrapePlace();
-    if (!place.name) return;
+    // Act when a place is open OR when we saved from a card that links to one.
+    const onPlace = /\/maps\/place\//.test(location.href);
+    const cardHasPlace =
+      scope && scope.querySelector && scope.querySelector('a[href*="/maps/place/"]');
+    if (!onPlace && !cardHasPlace) return;
+
+    const place = scrapePlace(scope);
+    if (!place.name || AD_LABELS.test(place.name)) return;
 
     // De-dupe rapid double clicks for the same place.
     const key = place.url || place.name + place.address;
@@ -143,7 +207,7 @@
       const btn = findSaveButton(e.target);
       if (btn) {
         // Give the panel a tick to settle, then scrape + send.
-        setTimeout(handleSaveClick, 50);
+        setTimeout(() => handleSaveClick(btn), 50);
       }
     },
     true // capture phase, so we see it before Maps stops propagation
