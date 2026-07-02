@@ -25,10 +25,16 @@ the page itself and reads the open place panel.
 1. Go to <https://script.google.com> → **New project**.
 2. Delete the sample code, paste everything from `apps-script/Code.gs`, and **Save**.
 3. Click **Deploy ▸ New deployment** → gear icon ▸ **Web app**.
-   - **Execute as:** Me
+   - **Execute as:** User accessing the web app
    - **Who has access:** Anyone
-4. Click **Deploy**, authorize when prompted, and **copy the Web app URL**
-   (it ends in `/exec`).
+4. Click **Deploy** and **copy the Web app URL** (it ends in `/exec`).
+
+Deploying as "User accessing the web app" means the script runs with *each caller's own*
+Google permissions — one shared deployment can be used by anyone, and appends only succeed
+for Sheets that caller personally has editor access to.
+
+Every user (including you) must open the `/exec` URL directly in a browser **once** and click
+through the Google authorization prompt before it will work from the extension.
 
 ### 2. Load the extension
 
@@ -56,8 +62,10 @@ Duplicate places (same Maps URL) are skipped automatically.
 - The Save detector and scraper rely on Google Maps' current DOM. If Google changes their
   markup, selectors in `content.js` (`findSaveButton`, `scrapePlace`) may need a tweak.
 - Some fields (phone, website) only fill in if they're shown on the place panel.
-- The target Sheet (if set) must be owned by or shared (edit access) with the account the
-  Web App is deployed as ("Execute as: Me"), otherwise appends will fail.
+- The target Sheet (if set) must be shared with (or owned by) *whoever's browser* is calling
+  the extension, with at least Editor access — the script runs as that caller, not the deployer.
+- Each user must complete the one-time authorization (open the `/exec` URL, sign in, allow
+  access) before saves from the extension will work for their account.
 - Everything stays between your browser and *your* Google account — no third-party server.
 
 ## Files

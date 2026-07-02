@@ -1,13 +1,21 @@
 /**
  * Maps → Sheet Saver — backend.
  * Paste this into a Google Apps Script project, deploy as a Web App
- * ("Execute as: Me", "Who has access: Anyone"), and put the /exec URL
- * into the Chrome extension popup.
+ * ("Execute as: User accessing the web app", "Who has access: Anyone"),
+ * and put the /exec URL into the Chrome extension popup.
+ *
+ * Deploying with "Execute as: User accessing the web app" means the script
+ * runs with each caller's own Google permissions — so a single shared
+ * deployment lets anyone with editor access to a target Sheet append to it,
+ * not just whoever deployed the script. Each user must open the /exec URL
+ * once in a browser to grant it permission before calling it from the
+ * extension.
  *
  * If the request includes a targetSheetUrl (set via the popup's optional
  * "Append to this Sheet" field), rows are appended there. Otherwise, on
- * the first save it auto-creates a spreadsheet named below and remembers
- * its ID, so you never have to create the Sheet yourself.
+ * the first save it auto-creates a spreadsheet named below (owned by that
+ * caller) and remembers its ID for them, so no one has to create a Sheet
+ * themselves.
  */
 
 var SHEET_NAME = "Shortlisted Companies";
@@ -60,16 +68,19 @@ function doGet() {
 }
 
 function getSheet_(targetSheetUrl) {
-  var props = PropertiesService.getScriptProperties();
+  // Scoped to the calling user (not the deployer), since the script runs
+  // as "User accessing the web app" — each caller gets their own fallback Sheet.
+  var props = PropertiesService.getUserProperties();
   var ss;
 
   if (targetSheetUrl) {
     // Caller gave us a Sheet to append to — use it directly, every time.
+    // This succeeds as long as the calling user has editor access to it.
     var id = extractSpreadsheetId_(targetSheetUrl);
     if (!id) throw new Error("That doesn't look like a Google Sheets link.");
     ss = SpreadsheetApp.openById(id);
   } else {
-    // No Sheet given — reuse the one we auto-created before, or make a new one.
+    // No Sheet given — reuse the one we auto-created before for this user, or make a new one.
     var storedId = props.getProperty("SPREADSHEET_ID");
     if (storedId) {
       try {
