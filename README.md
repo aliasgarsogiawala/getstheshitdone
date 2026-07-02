@@ -39,7 +39,9 @@ the page itself and reads the open place panel.
 ### 3. Connect them
 
 1. Click the extension icon → paste the **/exec URL** → **Save settings**.
-2. Click **Test** — a `TEST —` row should appear and the **Open your Sheet ↗** link lights up.
+2. (Optional) Paste a link to an existing Google Sheet into **Append to this Sheet** if you
+   want rows added there instead of a new spreadsheet. Leave it blank and one is created for you.
+3. Click **Test** — a `TEST —` row should appear and the **Open your Sheet ↗** link lights up.
 
 ---
 
@@ -54,6 +56,8 @@ Duplicate places (same Maps URL) are skipped automatically.
 - The Save detector and scraper rely on Google Maps' current DOM. If Google changes their
   markup, selectors in `content.js` (`findSaveButton`, `scrapePlace`) may need a tweak.
 - Some fields (phone, website) only fill in if they're shown on the place panel.
+- The target Sheet (if set) must be owned by or shared (edit access) with the account the
+  Web App is deployed as ("Execute as: Me"), otherwise appends will fail.
 - Everything stays between your browser and *your* Google account — no third-party server.
 
 ## Files

@@ -4,8 +4,10 @@
  * ("Execute as: Me", "Who has access: Anyone"), and put the /exec URL
  * into the Chrome extension popup.
  *
- * On the first save it auto-creates a spreadsheet named below and
- * remembers its ID, so you never have to create the Sheet yourself.
+ * If the request includes a targetSheetUrl (set via the popup's optional
+ * "Append to this Sheet" field), rows are appended there. Otherwise, on
+ * the first save it auto-creates a spreadsheet named below and remembers
+ * its ID, so you never have to create the Sheet yourself.
  */
 
 var SHEET_NAME = "Shortlisted Companies";
@@ -25,7 +27,7 @@ var HEADERS = [
 function doPost(e) {
   try {
     var place = JSON.parse(e.postData.contents);
-    var sheet = getSheet_();
+    var sheet = getSheet_(place.targetSheetUrl);
 
     // De-dupe: skip if this Maps URL (or name+address) is already a row.
     if (isDuplicate_(sheet, place)) {
@@ -57,21 +59,29 @@ function doGet() {
   return json_({ ok: true, sheetUrl: sheet.getParent().getUrl() });
 }
 
-function getSheet_() {
+function getSheet_(targetSheetUrl) {
   var props = PropertiesService.getScriptProperties();
-  var id = props.getProperty("SPREADSHEET_ID");
   var ss;
 
-  if (id) {
-    try {
-      ss = SpreadsheetApp.openById(id);
-    } catch (e) {
-      ss = null; // sheet was deleted — recreate below
+  if (targetSheetUrl) {
+    // Caller gave us a Sheet to append to — use it directly, every time.
+    var id = extractSpreadsheetId_(targetSheetUrl);
+    if (!id) throw new Error("That doesn't look like a Google Sheets link.");
+    ss = SpreadsheetApp.openById(id);
+  } else {
+    // No Sheet given — reuse the one we auto-created before, or make a new one.
+    var storedId = props.getProperty("SPREADSHEET_ID");
+    if (storedId) {
+      try {
+        ss = SpreadsheetApp.openById(storedId);
+      } catch (e) {
+        ss = null; // sheet was deleted — recreate below
+      }
     }
-  }
-  if (!ss) {
-    ss = SpreadsheetApp.create(SHEET_NAME);
-    props.setProperty("SPREADSHEET_ID", ss.getId());
+    if (!ss) {
+      ss = SpreadsheetApp.create(SHEET_NAME);
+      props.setProperty("SPREADSHEET_ID", ss.getId());
+    }
   }
 
   var sheet = ss.getSheets()[0];
@@ -81,6 +91,15 @@ function getSheet_() {
     sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+// Pulls the spreadsheet ID out of a full Sheets URL, or passes through a bare ID.
+function extractSpreadsheetId_(urlOrId) {
+  var s = String(urlOrId).trim();
+  var m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(s)) return s; // looks like a bare spreadsheet ID
+  return null;
 }
 
 function isDuplicate_(sheet, place) {

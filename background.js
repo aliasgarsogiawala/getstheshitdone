@@ -8,9 +8,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 async function handleSave(place) {
-  const { webAppUrl, enabled = true } = await chrome.storage.sync.get([
+  const { webAppUrl, enabled = true, targetSheetUrl = "" } = await chrome.storage.sync.get([
     "webAppUrl",
-    "enabled"
+    "enabled",
+    "targetSheetUrl"
   ]);
 
   if (!enabled) return { ok: false, error: "Saving is turned off" };
@@ -21,7 +22,7 @@ async function handleSave(place) {
       method: "POST",
       // text/plain avoids a CORS preflight; Apps Script reads e.postData.contents.
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(place)
+      body: JSON.stringify({ ...place, targetSheetUrl })
     });
     const data = await res.json().catch(() => ({}));
 

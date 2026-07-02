@@ -7,9 +7,10 @@ function setStatus(msg, ok) {
 }
 
 async function load() {
-  const sync = await chrome.storage.sync.get(["webAppUrl", "enabled"]);
+  const sync = await chrome.storage.sync.get(["webAppUrl", "enabled", "targetSheetUrl"]);
   const local = await chrome.storage.local.get(["savedCount", "lastPlace", "sheetUrl"]);
   $("url").value = sync.webAppUrl || "";
+  $("targetSheet").value = sync.targetSheetUrl || "";
   $("enabled").checked = sync.enabled !== false; // default on
   $("count").textContent = local.savedCount || 0;
   $("last").textContent = local.lastPlace || "—";
@@ -26,7 +27,12 @@ $("save").addEventListener("click", async () => {
     setStatus("That doesn't look like a Web App /exec URL.", false);
     return;
   }
-  await chrome.storage.sync.set({ webAppUrl: url, enabled: $("enabled").checked });
+  const targetSheetUrl = $("targetSheet").value.trim();
+  if (targetSheetUrl && !/^https:\/\/docs\.google\.com\/spreadsheets\/d\/.+/.test(targetSheetUrl)) {
+    setStatus("That doesn't look like a Google Sheets link.", false);
+    return;
+  }
+  await chrome.storage.sync.set({ webAppUrl: url, targetSheetUrl, enabled: $("enabled").checked });
   setStatus("Saved.", true);
 });
 
@@ -48,7 +54,8 @@ $("test").addEventListener("click", async () => {
     reviews: "",
     plusCode: "",
     url: "https://www.google.com/maps",
-    savedAt: new Date().toISOString()
+    savedAt: new Date().toISOString(),
+    targetSheetUrl: $("targetSheet").value.trim()
   };
   try {
     const res = await fetch(url, {
