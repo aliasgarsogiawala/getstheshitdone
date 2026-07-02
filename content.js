@@ -196,8 +196,14 @@
     chrome.runtime.sendMessage({ type: "SAVE_PLACE", place }, (resp) => {
       // Swallow errors if the service worker is asleep; it will still process.
       void chrome.runtime.lastError;
-      if (resp && resp.ok) toast("✓ Added to your Sheet: " + place.name);
-      else if (resp && resp.error) toast("⚠ Sheet error: " + resp.error);
+      if (resp && resp.ok) {
+        const msg = resp.isFirstSave
+          ? "✓ Your Sheet is ready — opening it now"
+          : "✓ Added to your Sheet: " + place.name;
+        toast(msg, resp.sheetUrl);
+      } else if (resp && resp.error) {
+        toast("⚠ Sheet error: " + resp.error);
+      }
     });
   }
 
@@ -215,7 +221,7 @@
 
   // --- Tiny on-page toast ---------------------------------------------------
 
-  function toast(msg) {
+  function toast(msg, sheetUrl) {
     let t = document.getElementById("__maps_sheet_toast");
     if (!t) {
       t = document.createElement("div");
@@ -226,7 +232,16 @@
         "box-shadow:0 4px 14px rgba(0,0,0,.35);max-width:80vw;transition:opacity .25s";
       document.body.appendChild(t);
     }
-    t.textContent = msg;
+    t.textContent = msg + " ";
+    if (sheetUrl) {
+      const link = document.createElement("a");
+      link.href = sheetUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Open Sheet ↗";
+      link.style.cssText = "color:#8ab4f8;text-decoration:underline;margin-left:4px;";
+      t.appendChild(link);
+    }
     t.style.opacity = "1";
     clearTimeout(t.__timer);
     t.__timer = setTimeout(() => (t.style.opacity = "0"), 3000);

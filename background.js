@@ -32,13 +32,19 @@ async function handleSave(place) {
 
     // Track count + last sheet URL for the popup.
     const { savedCount = 0 } = await chrome.storage.local.get("savedCount");
+    const isFirstSave = savedCount === 0;
     await chrome.storage.local.set({
       savedCount: savedCount + 1,
       lastPlace: place.name,
       sheetUrl: data.sheetUrl || (await chrome.storage.local.get("sheetUrl")).sheetUrl
     });
 
-    return { ok: true, sheetUrl: data.sheetUrl };
+    // Land the user straight on the newly-created Sheet the first time.
+    if (isFirstSave && data.sheetUrl) {
+      chrome.tabs.create({ url: data.sheetUrl });
+    }
+
+    return { ok: true, sheetUrl: data.sheetUrl, isFirstSave };
   } catch (err) {
     return { ok: false, error: String(err && err.message ? err.message : err) };
   }
